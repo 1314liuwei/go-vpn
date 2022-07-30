@@ -36,35 +36,47 @@ type NativeTUN struct {
 }
 
 func (tun NativeTUN) File() *os.File {
-	//TODO implement me
-	panic("implement me")
+	return tun.tunFile
 }
 
 func (tun NativeTUN) Read(bytes []byte) (int, error) {
-	//TODO implement me
-	panic("implement me")
+	return tun.tunFile.Read(bytes)
 }
 
 func (tun NativeTUN) Write(bytes []byte) (int, error) {
-	//TODO implement me
-	panic("implement me")
+	return tun.tunFile.Write(bytes)
 }
 
 func (tun NativeTUN) Flush() error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (tun NativeTUN) MTU() (int, error) {
-	//TODO implement me
-	panic("implement me")
+	name, err := tun.Name()
+	if err != nil {
+		return -1, err
+	}
+
+	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
+	if err != nil {
+		return 0, err
+	}
+	defer unix.Close(fd)
+
+	var ifr ifReq
+	copy(ifr[:], name)
+	err = ioctl(uintptr(fd), unix.SIOCGIFMTU, uintptr(unsafe.Pointer(&ifr)))
+	if err != nil {
+		return -1, err
+	}
+	return int(*(*int32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ]))), nil
 }
 
 func (tun NativeTUN) Name() (string, error) {
 	if tun.name != "" {
 		return tun.name, nil
 	} else {
-		return tun.getNameFromInterface()
+		return tun.getNameFromSystem()
 	}
 }
 
@@ -101,7 +113,7 @@ func (tun NativeTUN) setMTU(mtu int) error {
 	return nil
 }
 
-func (tun NativeTUN) getNameFromInterface() (string, error) {
+func (tun NativeTUN) getNameFromSystem() (string, error) {
 	conn, err := tun.tunFile.SyscallConn()
 	if err != nil {
 		return "", err
@@ -167,6 +179,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 		return nil, err
 	}
 
+	// 将文件描述符转换为 *os.File 对象
 	file := os.NewFile(uintptr(fd), defaultCloneTUNPath)
 	return CreateTUNFromFile(file, mtu)
 }
@@ -176,12 +189,13 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 		tunFile: file,
 	}
 
+	// 获取网卡名字
 	name, err := tun.Name()
 	if err != nil {
 		return nil, err
 	}
 
-	// 设置网卡设备序列号
+	// 获取网卡唯一索引号
 	tun.index, err = getIFIndex(name)
 	if err != nil {
 		return nil, err
@@ -201,7 +215,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 	return tun, nil
 }
 
-// getIFIndex 获取设备序列号
+// getIFIndex 获取网卡唯一索引号
 func getIFIndex(name string) (int32, error) {
 	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
 	if err != nil {
@@ -211,16 +225,17 @@ func getIFIndex(name string) (int32, error) {
 
 	var ifr ifReq
 	copy(ifr[:], name)
-	// 获取设备序列号
+	// 获取网卡唯一索引号
 	err = ioctl(uintptr(fd), unix.SIOCGIFINDEX, uintptr(unsafe.Pointer(&ifr[0])))
 	if err != nil {
 		return 0, err
 	}
-	// 获取序列号，参考 ifreq 结构体
+	// 解析得到索引号，参考 ifreq 结构体
 	return *(*int32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])), nil
 }
 
 func createNetlinkSocket() (int, error) {
+	// 创建一个 NETLINK_ROUTE 类型的 Netlink 套接字
 	sock, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
 	if err != nil {
 		return -1, err
