@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultCloneTUNPath = "/dev/net/device"
+	defaultCloneTUNPath = "/dev/net/tun"
 )
 
 // ifreq 占用 40个字节: https://man7.org/linux/man-pages/man7/netdevice.7.html

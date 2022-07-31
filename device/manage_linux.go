@@ -49,12 +49,16 @@ func (m *Manage) SetAddrIPv4(addr string) error {
 	}
 	defer unix.Close(fd)
 
-	// 配置 ip 地址
 	var ifr ifReq
 	var address [4]byte
 
+	// 配置 ip 地址
 	copy(ifr[:], name)
-	copy(address[:], net.ParseIP(addr))
+	ip, network, err := net.ParseCIDR(addr)
+	if err != nil {
+		return err
+	}
+	copy(address[:], ip.To4())
 	sock := unix.RawSockaddrInet4{
 		Family: unix.AF_INET,
 		Addr:   address,
@@ -62,6 +66,17 @@ func (m *Manage) SetAddrIPv4(addr string) error {
 	*(*unix.RawSockaddrInet4)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = sock
 
 	err = ioctl(uintptr(fd), unix.SIOCSIFADDR, uintptr(unsafe.Pointer(&ifr)))
+	if err != nil {
+		return err
+	}
+
+	// 设置子网掩码
+	copy(address[:], network.Mask)
+	sock = unix.RawSockaddrInet4{
+		Family: unix.AF_INET,
+		Addr:   address,
+	}
+	err = ioctl(uintptr(fd), unix.SIOCSIFNETMASK, uintptr(unsafe.Pointer(&ifr)))
 	if err != nil {
 		return err
 	}
