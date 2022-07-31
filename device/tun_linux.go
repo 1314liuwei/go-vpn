@@ -1,4 +1,4 @@
-package tun
+package device
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	defaultCloneTUNPath = "/dev/net/tun"
+	defaultCloneTUNPath = "/dev/net/device"
 )
 
 // ifreq 占用 40个字节: https://man7.org/linux/man-pages/man7/netdevice.7.html
@@ -88,31 +88,6 @@ func (tun NativeTUN) Close() error {
 	return nil
 }
 
-func (tun NativeTUN) setMTU(mtu int) error {
-	name, err := tun.Name()
-	if err != nil {
-		return err
-	}
-
-	// 获取 socket 文件句柄
-	fd, err := unix.Socket(unix.AF_INET, unix.SOCK_DGRAM, 0)
-	if err != nil {
-		return err
-	}
-	defer unix.Close(fd)
-
-	// 设置 mtu
-	var ifr ifReq
-	copy(ifr[:], name)
-	*(*uint32)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = uint32(mtu)
-	err = ioctl(uintptr(fd), unix.SIOCSIFMTU, uintptr(unsafe.Pointer(&ifr)))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (tun NativeTUN) getNameFromSystem() (string, error) {
 	conn, err := tun.tunFile.SyscallConn()
 	if err != nil {
@@ -143,7 +118,7 @@ func (tun NativeTUN) getNameFromSystem() (string, error) {
 	return tun.name, nil
 }
 
-func CreateTUN(name string, mtu int) (Device, error) {
+func CreateTUN(name string) (Device, error) {
 	fd, err := unix.Open(defaultCloneTUNPath, os.O_RDWR, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -164,7 +139,7 @@ func CreateTUN(name string, mtu int) (Device, error) {
 
 	// 拷贝名字
 	copy(ifr[:], nameBytes)
-	// 拷贝 flags
+	// 设置 flags
 	*(*uint16)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = unix.IFF_TUN
 	err = ioctl(uintptr(fd), unix.TUNSETIFF, uintptr(unsafe.Pointer(&ifr)))
 	if err != nil {
@@ -181,10 +156,10 @@ func CreateTUN(name string, mtu int) (Device, error) {
 
 	// 将文件描述符转换为 *os.File 对象
 	file := os.NewFile(uintptr(fd), defaultCloneTUNPath)
-	return CreateTUNFromFile(file, mtu)
+	return CreateTUNFromFile(file)
 }
 
-func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
+func CreateTUNFromFile(file *os.File) (Device, error) {
 	tun := &NativeTUN{
 		tunFile: file,
 	}
@@ -204,11 +179,6 @@ func CreateTUNFromFile(file *os.File, mtu int) (Device, error) {
 	tun.netlinkSock, err = createNetlinkSocket()
 	if err != nil {
 		unix.Close(tun.netlinkSock)
-		return nil, err
-	}
-
-	err = tun.setMTU(mtu)
-	if err != nil {
 		return nil, err
 	}
 

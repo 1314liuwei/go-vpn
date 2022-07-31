@@ -1,4 +1,4 @@
-package tun
+package device
 
 import (
 	"net"
@@ -9,7 +9,7 @@ import (
 
 func TestCreateTUN(t *testing.T) {
 	name := "testTun"
-	tun, err := CreateTUN(name, 1280)
+	tun, err := CreateTUN(name)
 	if err != nil {
 		return
 	}
@@ -17,5 +17,4 @@ func TestCreateTUN(t *testing.T) {
 
 	byName, err := net.InterfaceByName(name)
 	assert.NotNil(t, byName)
-	assert.Equal(t, byName.MTU, 1280)
 }

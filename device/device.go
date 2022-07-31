@@ -1,4 +1,4 @@
-package tun
+package device
 
 import (
 	"os"
@@ -16,14 +16,4 @@ type Device interface {
 
 type Config struct {
 	IsTAP bool
-}
-
-func New(conf Config) (Device, error) {
-
-	if conf.IsTAP {
-
-	} else {
-	}
-
-	return nil, nil
 }
