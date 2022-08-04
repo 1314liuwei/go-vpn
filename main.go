@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"go-vpn/cmd"
 )
 
 func main() {
-	fmt.Println("Hello, go-vpn!")
+	cmd.Execute()
 }
