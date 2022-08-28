@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"fmt"
@@ -21,6 +21,6 @@ to quickly create a Cobra application.`,
 }
 
 func Execute() {
-	rootCmd.AddCommand(server, client)
+	rootCmd.AddCommand(client)
 	cobra.CheckErr(rootCmd.Execute())
 }

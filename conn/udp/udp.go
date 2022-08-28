@@ -4,12 +4,45 @@ import (
 	"fmt"
 	"go-vpn/conn"
 	"net"
+	"time"
 )
 
 var _ conn.Conn = new(Connection)
 
 type Connection struct {
 	conn *net.UDPConn
+}
+
+func (c Connection) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
+	return c.conn.ReadFromUDP(p)
+}
+
+func (c Connection) WriteTo(p []byte, addr net.Addr) (n int, err error) {
+	udpAddr, err := net.ResolveUDPAddr(addr.Network(), addr.String())
+	if err != nil {
+		return 0, err
+	}
+	return c.conn.WriteToUDP(p, udpAddr)
+}
+
+func (c Connection) LocalAddr() net.Addr {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c Connection) SetDeadline(t time.Time) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c Connection) SetReadDeadline(t time.Time) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (c Connection) SetWriteDeadline(t time.Time) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (c Connection) Read(p []byte) (n int, err error) {

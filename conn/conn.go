@@ -1,6 +1,9 @@
 package conn
 
-import "io"
+import (
+	"io"
+	"net"
+)
 
 const (
 	Server = iota
@@ -9,4 +12,5 @@ const (
 
 type Conn interface {
 	io.ReadWriteCloser
+	net.PacketConn
 }
