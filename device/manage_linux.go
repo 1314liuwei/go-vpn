@@ -1,9 +1,10 @@
 package device
 
 import (
-	"golang.org/x/sys/unix"
 	"net"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 func (m *Manage) SetMTU(mtu int) error {
@@ -58,6 +59,7 @@ func (m *Manage) SetAddrIPv4(addr string) error {
 	if err != nil {
 		return err
 	}
+
 	copy(address[:], ip.To4())
 	sock := unix.RawSockaddrInet4{
 		Family: unix.AF_INET,
@@ -76,6 +78,7 @@ func (m *Manage) SetAddrIPv4(addr string) error {
 		Family: unix.AF_INET,
 		Addr:   address,
 	}
+	*(*unix.RawSockaddrInet4)(unsafe.Pointer(&ifr[unix.IFNAMSIZ])) = sock
 	err = ioctl(uintptr(fd), unix.SIOCSIFNETMASK, uintptr(unsafe.Pointer(&ifr)))
 	if err != nil {
 		return err
