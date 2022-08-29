@@ -5,9 +5,15 @@ import (
 	"net"
 )
 
+type Mode int
+
+func (m Mode) String() string {
+	return []string{"Client", "Server"}[m]
+}
+
 const (
-	Server = iota
-	Client
+	Client Mode = iota
+	Server
 )
 
 type Conn interface {

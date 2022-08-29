@@ -16,11 +16,12 @@ type Conn struct {
 	Port int
 }
 
-func New() (*Config, error) {
+func New(path string) (*Config, error) {
 	var config Config
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("../config")
+	//viper.SetConfigName("config")
+	//viper.SetConfigType("yaml")
+	//viper.AddConfigPath("../config")
+	viper.SetConfigFile(path)
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
