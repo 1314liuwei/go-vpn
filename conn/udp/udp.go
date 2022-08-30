@@ -1,7 +1,6 @@
 package udp
 
 import (
-	"fmt"
 	"go-vpn/conn"
 	"net"
 	"time"
@@ -26,8 +25,7 @@ func (c Connection) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 }
 
 func (c Connection) LocalAddr() net.Addr {
-	//TODO implement me
-	panic("implement me")
+	return c.conn.LocalAddr()
 }
 
 func (c Connection) SetDeadline(t time.Time) error {
@@ -57,34 +55,15 @@ func (c Connection) Close() error {
 	return c.conn.Close()
 }
 
-func New(addr string, port int, mode conn.Mode) (conn.Conn, error) {
-	switch mode {
-	case conn.Server:
-		udp, err := net.ListenUDP("udp", &net.UDPAddr{
-			IP:   net.ParseIP(addr).To4(),
-			Port: port,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return &Connection{
-			conn: udp,
-		}, nil
-	case conn.Client:
-		udp, err := net.DialUDP("udp", nil, &net.UDPAddr{
-			IP:   net.ParseIP(addr),
-			Port: port,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return &Connection{
-			conn: udp,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknow running mode")
+func New(port int) (conn.Conn, error) {
+	udp, err := net.ListenUDP("udp", &net.UDPAddr{
+		Port: port,
+	})
+	if err != nil {
+		return nil, err
 	}
 
+	return &Connection{
+		conn: udp,
+	}, nil
 }
