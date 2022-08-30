@@ -2,8 +2,9 @@ package main
 
 import (
 	"flag"
-
-	"github.com/gogf/gf/v2/frame/g"
+	"go-vpn/conn"
+	"go-vpn/engine"
+	"strings"
 )
 
 type args struct {
@@ -19,5 +20,24 @@ func main() {
 	flag.StringVar(&args.mode, "mode", "client", "udp work mode")
 	flag.Parse()
 
-	g.Dump(args)
+	var mode conn.Mode
+	switch strings.ToLower(args.mode) {
+	case "server":
+		mode = conn.Server
+	case "client":
+		mode = conn.Client
+	default:
+		mode = conn.Client
+	}
+
+	e := engine.Engine{
+		Mode: mode,
+		Addr: args.addr,
+		Port: args.port,
+	}
+
+	err := e.Run()
+	if err != nil {
+		return
+	}
 }

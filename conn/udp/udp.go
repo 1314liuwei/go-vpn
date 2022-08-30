@@ -57,7 +57,7 @@ func (c Connection) Close() error {
 	return c.conn.Close()
 }
 
-func New(addr string, port int, mode int) (conn.Conn, error) {
+func New(addr string, port int, mode conn.Mode) (conn.Conn, error) {
 	switch mode {
 	case conn.Server:
 		udp, err := net.ListenUDP("udp", &net.UDPAddr{
