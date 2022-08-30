@@ -3,6 +3,7 @@ package udp
 import (
 	"go-vpn/conn"
 	"net"
+	"net/netip"
 	"time"
 )
 
@@ -51,11 +52,19 @@ func (c Connection) Write(p []byte) (n int, err error) {
 	return c.conn.Write(p)
 }
 
+func (c Connection) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (int, error) {
+	return c.conn.WriteToUDPAddrPort(b, addr)
+}
+
+func (c Connection) ReadFromUDPAddrPort(b []byte) (n int, addr netip.AddrPort, err error) {
+	return c.conn.ReadFromUDPAddrPort(b)
+}
+
 func (c Connection) Close() error {
 	return c.conn.Close()
 }
 
-func New(port int) (conn.Conn, error) {
+func New(port int) (*Connection, error) {
 	udp, err := net.ListenUDP("udp", &net.UDPAddr{
 		Port: port,
 	})
