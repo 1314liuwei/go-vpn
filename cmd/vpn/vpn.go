@@ -7,19 +7,22 @@ import (
 )
 
 type args struct {
-	addr string
-	port int
+	lPort int
+	rAddr string
+	rPort int
 }
 
 func main() {
 	args := args{}
-	flag.IntVar(&args.port, "port", 0, "udp port")
-	flag.StringVar(&args.addr, "addr", "127.0.0.1", "udp listen addr")
+	flag.IntVar(&args.lPort, "lport", 18080, "local udp port")
+	flag.StringVar(&args.rAddr, "raddr", "127.0.0.1", "remote udp listen addr")
+	flag.IntVar(&args.rPort, "rport", 18081, "remote udp listen port")
 	flag.Parse()
 
 	e := engine.Engine{
-		Addr: args.addr,
-		Port: args.port,
+		LPort: args.lPort,
+		RAddr: args.rAddr,
+		RPort: args.rPort,
 	}
 
 	err := e.Run()

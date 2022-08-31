@@ -5,17 +5,19 @@ import (
 	"log"
 	"net/netip"
 	"sync"
+	"time"
 )
 
 type Engine struct {
-	Addr string
-	Port int
-	conn *udp.Connection
+	LPort int
+	RAddr string
+	RPort int
+	conn  *udp.Connection
 }
 
 func (e *Engine) Run() error {
 	var err error
-	e.conn, err = udp.New(e.Port)
+	e.conn, err = udp.New(e.LPort)
 	if err != nil {
 		return err
 	}
@@ -27,14 +29,16 @@ func (e *Engine) Run() error {
 		log.Println("start...")
 		for {
 			buff := []byte("hello world")
-			addr, err := netip.ParseAddr("127.0.0.1")
+			addr, err := netip.ParseAddr(e.RAddr)
 			if err != nil {
-				log.Fatal("parse: ", err)
+				panic(err)
 			}
-			_, err = e.conn.WriteToUDPAddrPort(buff, netip.AddrPortFrom(addr, 8088))
+			_, err = e.conn.WriteToUDPAddrPort(buff, netip.AddrPortFrom(addr, uint16(e.RPort)))
 			if err != nil {
-				log.Fatal("w:", err)
+				panic(err)
 			}
+			log.Println("send success!")
+			time.Sleep(time.Second)
 		}
 		wg.Done()
 	}()
@@ -43,11 +47,11 @@ func (e *Engine) Run() error {
 		log.Println("start...")
 		for {
 			buff := make([]byte, 1024)
-			_, endpoint, err := e.conn.ReadFromUDPAddrPort(buff)
+			n, endpoint, err := e.conn.ReadFromUDPAddrPort(buff)
 			if err != nil {
 				panic(err)
 			}
-			log.Println(endpoint)
+			log.Printf("%s:%d >> %s", endpoint.Addr(), endpoint.Port(), buff[:n])
 		}
 		wg.Done()
 	}()

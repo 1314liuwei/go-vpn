@@ -65,7 +65,7 @@ func (c Connection) Close() error {
 }
 
 func New(port int) (*Connection, error) {
-	udp, err := net.ListenUDP("udp", &net.UDPAddr{
+	udp, err := net.ListenUDP("udp4", &net.UDPAddr{
 		Port: port,
 	})
 	if err != nil {
