@@ -20,3 +20,8 @@ type Conn interface {
 	io.ReadWriteCloser
 	net.PacketConn
 }
+
+type Op struct {
+	Action string
+	Value  interface{}
+}

@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"go-vpn/conn"
 	"go-vpn/conn/udp"
 	"log"
 	"net/netip"
@@ -23,17 +24,20 @@ func (e *Engine) Run() error {
 	}
 
 	log.Println("start run...")
+
+	addr, err := netip.ParseAddr(e.RAddr)
+	if err != nil {
+		panic(err)
+	}
+	e.conn.Notify(conn.Op{Action: "add", Value: netip.AddrPortFrom(addr, uint16(e.RPort))})
+
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
-		log.Println("start...")
+		log.Println("start send...")
 		for {
 			buff := []byte("hello world")
-			addr, err := netip.ParseAddr(e.RAddr)
-			if err != nil {
-				panic(err)
-			}
-			_, err = e.conn.WriteToUDPAddrPort(buff, netip.AddrPortFrom(addr, uint16(e.RPort)))
+			_, err = e.conn.Write(buff)
 			if err != nil {
 				panic(err)
 			}
