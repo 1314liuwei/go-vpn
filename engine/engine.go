@@ -42,6 +42,7 @@ func (e *Engine) Run() error {
 				panic(err)
 			}
 			log.Println("send success!")
+			log.Println("send success!")
 			time.Sleep(time.Second)
 		}
 		wg.Done()
