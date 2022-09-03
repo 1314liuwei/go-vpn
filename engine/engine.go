@@ -88,8 +88,7 @@ func SendIPv4(conn *udp.Connection, dev device.Manager) {
 			log.Fatal(err)
 		}
 
-		p := protocol.New()
-		p.Parse(buff[:n])
+		protocol.Parse(buff[:n])
 		_, err = conn.Write(buff[:n])
 		if err != nil {
 			log.Fatal(err)

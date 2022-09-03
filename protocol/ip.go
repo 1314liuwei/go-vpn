@@ -5,15 +5,16 @@ import (
 	"net"
 )
 
-type IPProtocol int
+type IPv4Protocol int
 
+//https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers
 const (
-	ICMPProtocol IPProtocol = 1
-	TCPProtocol  IPProtocol = 6
-	UDPPProtocol IPProtocol = 17
+	ICMPProtocol IPv4Protocol = 1
+	TCPProtocol  IPv4Protocol = 6
+	UDPPProtocol IPv4Protocol = 17
 )
 
-type IPRaw struct {
+type IPv4Raw struct {
 	VersionAndHeaderLength      byte
 	DifferentiatedServicesField byte
 	TotalLength                 [2]byte
@@ -26,9 +27,10 @@ type IPRaw struct {
 	DestAddr                    [4]byte
 }
 
-type IP struct {
-	Version        int // IP 协议版本号, IPv4 or IPv6
-	HeaderLength   int // IP 报文首部长度
+// IPv4 : https://en.wikipedia.org/wiki/IPv4
+type IPv4 struct {
+	Version        int // IPv4 协议版本号, IPv4 or IPv6
+	HeaderLength   int // IPv4 报文首部长度
 	DSCP           int
 	TotalLength    int
 	ID             int
@@ -36,27 +38,27 @@ type IP struct {
 	MF             bool
 	Offset         int
 	TTL            int
-	Protocol       IPProtocol
+	Protocol       IPv4Protocol
 	HeaderChecksum int
 	SourceAddr     net.IP
 	DestAddr       net.IP
 }
 
-func (p Protocol) parseIPRawPacket(packet IPRaw) *IP {
-	ip := &IP{}
+func (p Protocol) parseIPv4RawPacket(packet IPv4Raw) *IPv4 {
+	ipv4 := &IPv4{}
 
-	ip.Version, ip.HeaderLength = parseVersionAndHeaderLength(packet.VersionAndHeaderLength)
-	ip.DSCP = util.Binary2Decimal(util.Bytes2Bits(packet.DifferentiatedServicesField)[:6])
-	ip.TotalLength = parse2ByteToInt(packet.TotalLength)
-	ip.ID = parse2ByteToInt(packet.Identification)
-	ip.DF, ip.MF, ip.Offset = parseFlags(packet.Flags)
-	ip.TTL = util.Binary2Decimal(util.Bytes2Bits(packet.TimeToLive))
-	ip.Protocol = IPProtocol(util.Binary2Decimal(util.Bytes2Bits(packet.Protocol)))
-	ip.HeaderChecksum = parse2ByteToInt(packet.HeaderChecksum)
-	ip.SourceAddr = net.IPv4(packet.SourceAddr[0], packet.SourceAddr[1], packet.SourceAddr[2], packet.SourceAddr[3])
-	ip.DestAddr = net.IPv4(packet.DestAddr[0], packet.DestAddr[1], packet.DestAddr[2], packet.DestAddr[3])
+	ipv4.Version, ipv4.HeaderLength = parseVersionAndHeaderLength(packet.VersionAndHeaderLength)
+	ipv4.DSCP = util.Binary2Decimal(util.Bytes2Bits(packet.DifferentiatedServicesField)[:6])
+	ipv4.TotalLength = parse2ByteToInt(packet.TotalLength)
+	ipv4.ID = parse2ByteToInt(packet.Identification)
+	ipv4.DF, ipv4.MF, ipv4.Offset = parseFlags(packet.Flags)
+	ipv4.TTL = util.Binary2Decimal(util.Bytes2Bits(packet.TimeToLive))
+	ipv4.Protocol = IPv4Protocol(util.Binary2Decimal(util.Bytes2Bits(packet.Protocol)))
+	ipv4.HeaderChecksum = parse2ByteToInt(packet.HeaderChecksum)
+	ipv4.SourceAddr = net.IPv4(packet.SourceAddr[0], packet.SourceAddr[1], packet.SourceAddr[2], packet.SourceAddr[3])
+	ipv4.DestAddr = net.IPv4(packet.DestAddr[0], packet.DestAddr[1], packet.DestAddr[2], packet.DestAddr[3])
 
-	return ip
+	return ipv4
 }
 
 func parseVersionAndHeaderLength(value byte) (int, int) {
