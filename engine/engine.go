@@ -4,6 +4,7 @@ import (
 	"go-vpn/conn"
 	"go-vpn/conn/udp"
 	"go-vpn/device"
+	"go-vpn/protocol"
 	"log"
 	"net/netip"
 )
@@ -87,6 +88,7 @@ func SendIPv4(conn *udp.Connection, dev device.Manager) {
 			log.Fatal(err)
 		}
 
+		protocol.Parse(buff[:n])
 		_, err = conn.Write(buff[:n])
 		if err != nil {
 			log.Fatal(err)
