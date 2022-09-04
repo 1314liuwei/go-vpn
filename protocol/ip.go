@@ -49,12 +49,12 @@ func (p Protocol) parseIPv4RawPacket(packet IPv4Raw) *IPv4 {
 
 	ipv4.Version, ipv4.HeaderLength = parseVersionAndHeaderLength(packet.VersionAndHeaderLength)
 	ipv4.DSCP = util.Binary2Decimal(util.Bytes2Bits(packet.DifferentiatedServicesField)[:6])
-	ipv4.TotalLength = parse2ByteToInt(packet.TotalLength)
-	ipv4.ID = parse2ByteToInt(packet.Identification)
+	ipv4.TotalLength = util.Binary2Decimal(util.Bytes2Bits(packet.TotalLength[0], packet.TotalLength[1]))
+	ipv4.ID = util.Binary2Decimal(util.Bytes2Bits(packet.Identification[0], packet.Identification[1]))
 	ipv4.DF, ipv4.MF, ipv4.Offset = parseFlags(packet.Flags)
 	ipv4.TTL = util.Binary2Decimal(util.Bytes2Bits(packet.TimeToLive))
 	ipv4.Protocol = IPv4Protocol(util.Binary2Decimal(util.Bytes2Bits(packet.Protocol)))
-	ipv4.HeaderChecksum = parse2ByteToInt(packet.HeaderChecksum)
+	ipv4.HeaderChecksum = util.Binary2Decimal(util.Bytes2Bits(packet.HeaderChecksum[0], packet.HeaderChecksum[1]))
 	ipv4.SourceAddr = net.IPv4(packet.SourceAddr[0], packet.SourceAddr[1], packet.SourceAddr[2], packet.SourceAddr[3])
 	ipv4.DestAddr = net.IPv4(packet.DestAddr[0], packet.DestAddr[1], packet.DestAddr[2], packet.DestAddr[3])
 
@@ -69,12 +69,6 @@ func parseVersionAndHeaderLength(value byte) (int, int) {
 	version = util.Binary2Decimal(buff[:4])
 	headerLength = util.Binary2Decimal(buff[4:])
 	return version, headerLength
-}
-
-func parse2ByteToInt(value [2]byte) int {
-	buff := util.Bytes2Bits(value[0])
-	buff = append(buff, util.Bytes2Bits(value[1])...)
-	return util.Binary2Decimal(buff)
 }
 
 func parseFlags(value [2]byte) (bool, bool, int) {

@@ -22,10 +22,17 @@ func (p Protocol) Parse(buff []byte) {
 	g.Dump(mac)
 	switch mac.Type {
 	case IPv4Type:
-		//ipSize := unsafe.Sizeof(IPv4{})
+		ipSize := unsafe.Sizeof(IPv4{})
 		ipRaw := *(*IPv4Raw)(unsafe.Pointer(&packet[macSize]))
 		ip := p.parseIPv4RawPacket(ipRaw)
 		g.Dump(ip)
+
+		switch ip.Protocol {
+		case ICMPProtocol:
+			icmp := *(*ICMPRaw)(unsafe.Pointer(&packet[macSize+ipSize]))
+			p.parseICMPRawPacket(icmp)
+			g.Dump(icmp)
+		}
 	default:
 		return
 	}
