@@ -3,6 +3,8 @@ package netcheck
 import (
 	"log"
 	"net"
+
+	"github.com/gogf/gf/v2/frame/g"
 )
 
 var (
@@ -35,7 +37,11 @@ func NatTypeTest() {
 			log.Fatal(err)
 			return
 		}
-		log.Printf("receive: %v", buff[:read])
-		return
+		attributes, err := parseResponseAttributes(buff[:read])
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+		g.Dump(attributes)
 	}
 }

@@ -14,7 +14,9 @@ func Bytes2Bits(data ...byte) []byte {
 func Binary2Decimal(buff []byte) int {
 	out := 0
 	for i := len(buff) - 1; i >= 0; i-- {
-		out += int(buff[i] << (len(buff) - 1 - i))
+		// 扩大类型容量
+		num := int(buff[i])
+		out += num << (len(buff) - 1 - i)
 	}
 	return out
 }
