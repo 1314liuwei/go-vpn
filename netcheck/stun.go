@@ -15,32 +15,32 @@ const (
 	STUNBindingResponse      = 0x0101
 	STUNBindingErrorResponse = 0x0111
 
-	MAPPED_ADDRESS     = 0x0001
-	RESPONSE_ADDRESS   = 0x0002
-	CHANGE_REQUEST     = 0x0003
-	SOURCE_ADDRESS     = 0x0004
-	CHANGED_ADDRESS    = 0x0005
-	USERNAME           = 0x0006
-	PASSWORD           = 0x0007
-	MESSAGE_INTEGRITY  = 0x0008
-	ERROR_CODE         = 0x0009
-	UNKNOWN_ATTRIBUTES = 0x000a
-	REFLECTED_FROM     = 0x000b
+	MappedAddress     = 0x0001
+	ResponseAddress   = 0x0002
+	ChangeRequest     = 0x0003
+	SourceAddress     = 0x0004
+	ChangedAddress    = 0x0005
+	USERNAME          = 0x0006
+	PASSWORD          = 0x0007
+	MessageIntegrity  = 0x0008
+	ErrorCode         = 0x0009
+	UnknownAttributes = 0x000a
+	ReflectedFrom     = 0x000b
 )
 
 var (
 	AttributesName = map[int]string{
-		MAPPED_ADDRESS:     "MAPPED_ADDRESS",
-		RESPONSE_ADDRESS:   "RESPONSE_ADDRESS",
-		CHANGE_REQUEST:     "CHANGE_REQUEST",
-		SOURCE_ADDRESS:     "SOURCE_ADDRESS",
-		CHANGED_ADDRESS:    "CHANGED_ADDRESS",
-		USERNAME:           "USERNAME",
-		PASSWORD:           "PASSWORD",
-		MESSAGE_INTEGRITY:  "MESSAGE_INTEGRITY",
-		ERROR_CODE:         "ERROR_CODE",
-		UNKNOWN_ATTRIBUTES: "UNKNOWN_ATTRIBUTES",
-		REFLECTED_FROM:     "REFLECTED_FROM",
+		MappedAddress:     "MAPPED_ADDRESS",
+		ResponseAddress:   "RESPONSE_ADDRESS",
+		ChangeRequest:     "CHANGE_REQUEST",
+		SourceAddress:     "SOURCE_ADDRESS",
+		ChangedAddress:    "CHANGED_ADDRESS",
+		USERNAME:          "USERNAME",
+		PASSWORD:          "PASSWORD",
+		MessageIntegrity:  "MESSAGE_INTEGRITY",
+		ErrorCode:         "ERROR_CODE",
+		UnknownAttributes: "UNKNOWN_ATTRIBUTES",
+		ReflectedFrom:     "REFLECTED_FROM",
 	}
 )
 
@@ -51,26 +51,56 @@ type STUNHeaderPacket struct {
 	TransactionID [12]byte
 }
 
-func buildRequestPacket() []byte {
+func buildRequestHeader(mLen int) []byte {
 	req := &STUNHeaderPacket{}
+
+	buff := make([]byte, 1024)
+	binary.BigEndian.PutUint16(buff, STUNBindingRequest)
+	copy(req.MessageType[:], buff)
+
+	binary.BigEndian.PutUint16(buff, uint16(mLen))
+	copy(req.MessageLength[:], buff)
+
+	binary.BigEndian.PutUint32(buff, 0x2112A442)
+	copy(req.MagicCookie[:], buff)
 
 	rand.Seed(time.Now().Unix())
 	tid := [12]byte{}
 	for i := 0; i < 12; i++ {
 		tid[i] = byte(rand.Int())
 	}
-
-	buff := make([]byte, 1024)
-	binary.BigEndian.PutUint16(buff, STUNBindingRequest)
-	copy(req.MessageType[:], buff)
-	req.MessageLength = [2]byte{0, 0}
-	binary.BigEndian.PutUint32(buff, 0x2112A442)
-	copy(req.MagicCookie[:], buff)
 	req.TransactionID = tid
 
 	*(*STUNHeaderPacket)(unsafe.Pointer(&buff[0])) = *req
 	size := unsafe.Sizeof(STUNHeaderPacket{})
 	return buff[:size]
+}
+
+func buildChangePortAndIPRequest(ip, port bool) []byte {
+	var packet []byte
+	header := buildRequestHeader(8)
+	packet = append(packet, header...)
+
+	// Attribute Type
+	buff := make([]byte, 1024)
+	binary.BigEndian.PutUint16(buff, ChangeRequest)
+	packet = append(packet, buff[:2]...)
+
+	// Attribute Length
+	binary.BigEndian.PutUint16(buff, 4)
+	packet = append(packet, buff[:2]...)
+
+	// Set IP and Port: 00000000 00000000 00000000 00000(IP)(Port)0
+	set := 0
+	if ip {
+		set += 4
+	}
+	if port {
+		set += 2
+	}
+	binary.BigEndian.PutUint32(buff, uint32(set))
+	packet = append(packet, buff[:4]...)
+	return packet
 }
 
 func parseResponseAttributes(buff []byte) (map[string]map[string]interface{}, error) {
@@ -94,7 +124,7 @@ func parseResponseAttributes(buff []byte) (map[string]map[string]interface{}, er
 		i += 2
 
 		switch AttributeTypeValue {
-		case MAPPED_ADDRESS, SOURCE_ADDRESS, CHANGED_ADDRESS:
+		case MappedAddress, SourceAddress, ChangedAddress:
 			if name, ok := AttributesName[AttributeTypeValue]; ok {
 				out[name] = parseAddressAttribute(buff[i : i+AttributeLength])
 			}
