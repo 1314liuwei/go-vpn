@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/util/gconv"
+)
 
-	"github.com/gogf/gf/v2/frame/g"
+const (
+	UDPBlocked = 127
 )
 
 var (
@@ -31,7 +33,6 @@ type MappingBehavior int
 
 const (
 	UnknownMapping MappingBehavior = iota
-	UDPBlocked
 	NoNAT
 	EndpointIndependentMapping
 	AddressAndPortDependentMapping
@@ -53,159 +54,17 @@ func NatTypeTest() (string, error) {
 	defer udp.Close()
 	log.Println(udp.LocalAddr().String())
 
-	var (
-		stepRes []map[string]map[string]interface{}
-	)
-
-	buff := make([]byte, 1024)
-	// Step1:
-	{
-		req := buildRequestHeader(0)
-		_, err = udp.WriteToUDP(req, stunAddr)
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		log.Println("step1 send success!")
-
-		err := udp.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if err != nil {
-			return "", err
-		}
-		read, _, err := udp.ReadFromUDP(buff)
-		if err != nil {
-			netErr, ok := err.(*net.OpError)
-			if ok && netErr.Timeout() {
-				return "UDP is not allowed", nil
-			} else {
-				return "", err
-			}
-		}
-		attributes, err := parseResponseAttributes(buff[:read])
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-
-		g.Dump(attributes)
+	mBehavior, err := probeMappingBehavior(udp, stunAddr)
+	if err != nil {
+		return "", err
 	}
+	log.Println("MappingBehavior: ", mBehavior)
 
-	// Step2:
-	{
-		req := buildChangePortAndIPRequest(true, true)
-		_, err = udp.WriteToUDP(req, stunAddr)
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		log.Println("step2 send success!")
-
-		err := udp.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if err != nil {
-			return "", err
-		}
-		read, _, err := udp.ReadFromUDP(buff)
-		if err != nil {
-			if err != nil {
-				netErr, ok := err.(*net.OpError)
-				if ok && netErr.Timeout() {
-					stepRes = append(stepRes, nil)
-					goto step3
-				} else {
-					return "", err
-				}
-			}
-		}
-
-		attributes, err := parseResponseAttributes(buff[:read])
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		g.Dump(attributes)
+	fBehavior, err := probeFilterBehavior(udp, stunAddr)
+	if err != nil {
+		return "", err
 	}
-
-step3:
-	// Step3:
-	{
-		req := buildChangePortAndIPRequest(false, true)
-		_, err = udp.WriteToUDP(req, stunAddr)
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		log.Println("step3 send success!")
-
-		err := udp.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if err != nil {
-			return "", err
-		}
-		read, _, err := udp.ReadFromUDP(buff)
-		if err != nil {
-			if err != nil {
-				netErr, ok := err.(*net.OpError)
-				if ok && netErr.Timeout() {
-					stepRes = append(stepRes, nil)
-					goto step4
-				} else {
-					return "", err
-				}
-			}
-		}
-
-		attributes, err := parseResponseAttributes(buff[:read])
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		g.Dump(attributes)
-	}
-
-step4:
-	// Step4:
-	{
-		if len(stepRes) > 1 {
-			step1 := stepRes[0]
-			changeAddr, ok := step1["CHANGED_ADDRESS"]["IP"]
-			if ok {
-				stunAddr.IP = net.ParseIP(gconv.String(changeAddr))
-			}
-		}
-		req := buildRequestHeader(0)
-		_, err := udp.WriteToUDP(req, stunAddr)
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		log.Println("step4 send success!")
-
-		err = udp.SetReadDeadline(time.Now().Add(5 * time.Second))
-		if err != nil {
-			return "", err
-		}
-		read, _, err := udp.ReadFromUDP(buff)
-		if err != nil {
-			if err != nil {
-				netErr, ok := err.(*net.OpError)
-				if ok && netErr.Timeout() {
-					stepRes = append(stepRes, nil)
-					goto end
-				} else {
-					return "", err
-				}
-			}
-		}
-
-		attributes, err := parseResponseAttributes(buff[:read])
-		if err != nil {
-			log.Fatal(err)
-			return "", err
-		}
-		g.Dump(attributes)
-	}
-
-end:
-	g.Dump(stepRes)
+	log.Println("FilterBehavior: ", fBehavior)
 	return "", nil
 }
 
@@ -225,6 +84,7 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 		return UnknownMapping, err
 	}
 	read, _, err := conn.ReadFromUDP(buff)
+
 	if err != nil {
 		netErr, ok := err.(*net.OpError)
 		if ok && netErr.Timeout() {
@@ -320,6 +180,61 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 		return AddressAndPortDependentMapping, nil
 	}
 	return UnknownMapping, nil
+}
+
+func probeFilterBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (FilteringBehavior, error) {
+	buff := make([]byte, 1024)
+
+	// Step1: 探测主机是否位于 NAT 后面
+	req := buildChangePortAndIPRequest(true, true)
+	_, err := conn.WriteToUDP(req, stunAddr)
+	if err != nil {
+		return UnknownFiltering, err
+	}
+
+	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err != nil {
+		return UnknownFiltering, err
+	}
+	read, _, err := conn.ReadFromUDP(buff)
+	if err != nil {
+		netErr, ok := err.(*net.OpError)
+		if ok && netErr.Timeout() {
+			goto step2
+		} else {
+			return UDPBlocked, err
+		}
+	}
+	_, err = parseResponseAttributes(buff[:read])
+	if err == nil {
+		return EndpointIndependentFiltering, err
+	}
+
+step2:
+	req = buildChangePortAndIPRequest(false, true)
+	_, err = conn.WriteToUDP(req, stunAddr)
+	if err != nil {
+		return UnknownFiltering, err
+	}
+
+	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if err != nil {
+		return UnknownFiltering, err
+	}
+	read, _, err = conn.ReadFromUDP(buff)
+	if err != nil {
+		netErr, ok := err.(*net.OpError)
+		if ok && netErr.Timeout() {
+			return AddressAndPortDependentFiltering, nil
+		} else {
+			return UDPBlocked, err
+		}
+	}
+	_, err = parseResponseAttributes(buff[:read])
+	if err == nil {
+		return AddressDependentFiltering, nil
+	}
+	return UnknownFiltering, nil
 }
 
 func isLocalAddrEqualRemoteAddr(laddr, raddr netip.AddrPort) bool {
