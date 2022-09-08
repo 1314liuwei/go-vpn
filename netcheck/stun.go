@@ -51,6 +51,13 @@ type STUNHeaderPacket struct {
 	TransactionID [12]byte
 }
 
+type AddressAttribute struct {
+	Reserved       int
+	ProtocolFamily int
+	Port           int
+	IP             net.IP
+}
+
 func buildRequestHeader(mLen int) []byte {
 	req := &STUNHeaderPacket{}
 
@@ -103,10 +110,10 @@ func buildChangePortAndIPRequest(ip, port bool) []byte {
 	return packet
 }
 
-func parseResponseAttributes(buff []byte) (map[string]map[string]interface{}, error) {
+func parseResponseAttributes(buff []byte) (map[string]AddressAttribute, error) {
 	var (
 		i      int
-		out    = map[string]map[string]interface{}{}
+		out    = map[string]AddressAttribute{}
 		header STUNHeaderPacket
 	)
 
@@ -135,17 +142,17 @@ func parseResponseAttributes(buff []byte) (map[string]map[string]interface{}, er
 	return out, nil
 }
 
-func parseAddressAttribute(buff []byte) map[string]interface{} {
+func parseAddressAttribute(buff []byte) AddressAttribute {
 	Reserved := util.Binary2Decimal(util.Bytes2Bits(buff[0]))
 	ProtocolFamily := util.Binary2Decimal(util.Bytes2Bits(buff[1]))
 	Port := util.Binary2Decimal(util.Bytes2Bits(buff[2], buff[3]))
-	IP := net.IPv4(buff[4], buff[5], buff[6], buff[7]).To4().String()
+	IP := net.IPv4(buff[4], buff[5], buff[6], buff[7]).To4()
 
-	out := map[string]interface{}{
-		"Reserved":       Reserved,
-		"ProtocolFamily": ProtocolFamily,
-		"Port":           Port,
-		"IP":             IP,
+	out := AddressAttribute{
+		Reserved:       Reserved,
+		ProtocolFamily: ProtocolFamily,
+		Port:           Port,
+		IP:             IP,
 	}
 	return out
 }
