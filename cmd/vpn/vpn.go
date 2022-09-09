@@ -2,6 +2,10 @@ package main
 
 import (
 	"go-vpn/netcheck"
+
+	"github.com/gogf/gf/v2/frame/g"
+
+	"github.com/gogf/gf/v2/os/gctx"
 )
 
 type args struct {
@@ -12,6 +16,7 @@ type args struct {
 }
 
 func main() {
+	ctx := gctx.New()
 	//args := args{}
 	//flag.IntVar(&args.lPort, "lport", 18080, "local udp port")
 	//flag.StringVar(&args.rAddr, "raddr", "127.0.0.1", "remote udp listen addr")
@@ -30,5 +35,9 @@ func main() {
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
-	netcheck.NatTypeTest()
+	mbc, fbc, err := netcheck.NatTypeTest(ctx)
+	if err != nil {
+		return
+	}
+	g.Dump(mbc, fbc)
 }

@@ -3,7 +3,6 @@ package netcheck
 import (
 	"encoding/binary"
 	"go-vpn/util"
-	"log"
 	"math/rand"
 	"net"
 	"time"
@@ -120,9 +119,6 @@ func parseResponseAttributes(buff []byte) (map[string]AddressAttribute, error) {
 	header = *(*STUNHeaderPacket)(unsafe.Pointer(&buff[0]))
 	size := int(unsafe.Sizeof(STUNHeaderPacket{}))
 	i = size
-
-	log.Printf("header: %v\n", header)
-	log.Printf("buff: %v\n", buff)
 
 	for i-size < util.Binary2Decimal(util.Bytes2Bits(header.MessageLength[0], header.MessageLength[1])) {
 		AttributeTypeValue := util.Binary2Decimal(util.Bytes2Bits(buff[i], buff[i+1]))

@@ -1,6 +1,8 @@
 package netcheck
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -39,33 +41,50 @@ const (
 	AddressDependentMapping
 )
 
-func NatTypeTest() (string, error) {
+func NatTypeTest(ctx context.Context) (MappingBehavior, FilteringBehavior, error) {
 	addr, err := net.ResolveIPAddr("ip", STUNServers[0])
 	if err != nil {
-		log.Fatal(err)
-		return "", err
+		return UnknownMapping, UnknownFiltering, err
 	}
 	stunAddr := &net.UDPAddr{IP: addr.IP, Port: 3478}
 
 	udp, err := net.ListenUDP("udp4", nil)
 	if err != nil {
-		return "", err
+		return UnknownMapping, UnknownFiltering, err
 	}
 	defer udp.Close()
-	log.Println(udp.LocalAddr().String())
 
-	mBehavior, err := probeMappingBehavior(udp, stunAddr)
-	if err != nil {
-		return "", err
-	}
-	log.Println("MappingBehavior: ", mBehavior)
+	mbc := make(chan MappingBehavior, 1)
+	fbc := make(chan FilteringBehavior, 1)
+	ec := make(chan error, 1)
 
-	fBehavior, err := probeFilterBehavior(udp, stunAddr)
-	if err != nil {
-		return "", err
+	go func() {
+		mBehavior, err := probeMappingBehavior(udp, stunAddr)
+		if err != nil {
+			ec <- err
+			return
+		}
+		mbc <- mBehavior
+	}()
+	go func() {
+		fBehavior, err := probeFilterBehavior(udp, stunAddr)
+		if err != nil {
+			ec <- err
+			return
+		}
+		fbc <- fBehavior
+	}()
+
+	select {
+	case <-ctx.Done():
+		return UnknownMapping, UnknownFiltering, err
+	case err := <-ec:
+		return UnknownMapping, UnknownFiltering, err
+	case <-time.After(time.Second * 10):
+		panic("timeout error")
 	}
-	log.Println("FilterBehavior: ", fBehavior)
-	return "", nil
+	fmt.Println("hello")
+	return <-mbc, <-fbc, nil
 }
 
 func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBehavior, error) {
@@ -136,7 +155,6 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 	}
 	attributes2, err := parseResponseAttributes(buff[:read])
 	if err != nil {
-		log.Fatal(err)
 		return UnknownMapping, err
 	}
 
