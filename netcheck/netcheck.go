@@ -2,7 +2,6 @@ package netcheck
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"net/netip"
@@ -13,6 +12,9 @@ import (
 
 const (
 	UDPBlocked = 127
+
+	SetConnTimeout = 3 * time.Second // 连接超时时间
+	SetTryoutTimes = 5               // 超时重传次数
 )
 
 var (
@@ -54,77 +56,43 @@ func NatTypeTest(ctx context.Context) (MappingBehavior, FilteringBehavior, error
 	}
 	defer udp.Close()
 
-	mbc := make(chan MappingBehavior, 1)
-	fbc := make(chan FilteringBehavior, 1)
-	ec := make(chan error, 1)
-
-	go func() {
-		mBehavior, err := probeMappingBehavior(udp, stunAddr)
-		if err != nil {
-			ec <- err
-			return
-		}
-		mbc <- mBehavior
-	}()
-	go func() {
-		fBehavior, err := probeFilterBehavior(udp, stunAddr)
-		if err != nil {
-			ec <- err
-			return
-		}
-		fbc <- fBehavior
-	}()
-
-	select {
-	case <-ctx.Done():
-		return UnknownMapping, UnknownFiltering, err
-	case err := <-ec:
-		return UnknownMapping, UnknownFiltering, err
-	case <-time.After(time.Second * 10):
-		panic("timeout error")
+	// 探测 Mapping 行为
+	mBehavior, err := probeMappingBehavior(ctx, udp, stunAddr)
+	if err != nil {
+		return UnknownMapping, UnknownFiltering, nil
 	}
-	fmt.Println("hello")
-	return <-mbc, <-fbc, nil
+	// 探测 Filtering 行为
+	fBehavior, err := probeFilterBehavior(ctx, udp, stunAddr)
+	if err != nil {
+		return UnknownMapping, UnknownFiltering, nil
+	}
+
+	return mBehavior, fBehavior, nil
 }
 
-func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBehavior, error) {
-	buff := make([]byte, 1024)
+func probeMappingBehavior(ctx context.Context, conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBehavior, error) {
+	log.Println("Start probe mapping behavior...")
+	defer log.Println("End probe mapping behavior!")
 
 	// Step1: 探测主机是否位于 NAT 后面
 	req := buildRequestHeader(0)
-	_, err := conn.WriteToUDP(req, stunAddr)
-	if err != nil {
-		log.Fatal(err)
-		return UnknownMapping, err
-	}
-
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err != nil {
-		return UnknownMapping, err
-	}
-	read, _, err := conn.ReadFromUDP(buff)
-
+	attributes1, err := probeSendAndReceive(ctx, conn, stunAddr, req)
 	if err != nil {
 		netErr, ok := err.(*net.OpError)
 		if ok && netErr.Timeout() {
-			return UnknownMapping, nil
+			return UDPBlocked, nil
 		} else {
-			return UDPBlocked, err
+			return UnknownMapping, err
 		}
-	}
-	attributes1, err := parseResponseAttributes(buff[:read])
-	if err != nil {
-		log.Fatal(err)
-		return UnknownMapping, err
 	}
 
 	laddr, err := netip.ParseAddrPort(conn.LocalAddr().String())
 	if err != nil {
-		return 0, err
+		return UnknownMapping, err
 	}
 	rAddr, err := netip.ParseAddr(attributes1[AttributesName[MappedAddress]].IP.To4().String())
 	if err != nil {
-		return 0, err
+		return UnknownMapping, err
 	}
 	raddr := netip.AddrPortFrom(rAddr, gconv.Uint16(attributes1[AttributesName[MappedAddress]].Port))
 	if isLocalAddrEqualRemoteAddr(laddr, raddr) {
@@ -135,27 +103,14 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 	// 使用 STUN 服务器的另一个地址进行检测
 	stunAddr.IP = attributes1[AttributesName[ChangedAddress]].IP
 	req = buildRequestHeader(0)
-	_, err = conn.WriteToUDP(req, stunAddr)
-	if err != nil {
-		return UnknownMapping, err
-	}
-
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err != nil {
-		return UnknownMapping, err
-	}
-	read, _, err = conn.ReadFromUDP(buff)
+	attributes2, err := probeSendAndReceive(ctx, conn, stunAddr, req)
 	if err != nil {
 		netErr, ok := err.(*net.OpError)
 		if ok && netErr.Timeout() {
-			return UnknownMapping, nil
+			return UDPBlocked, nil
 		} else {
-			return UDPBlocked, err
+			return UnknownMapping, err
 		}
-	}
-	attributes2, err := parseResponseAttributes(buff[:read])
-	if err != nil {
-		return UnknownMapping, err
 	}
 
 	// 如果第一次的地址和这一次的地址一致，则代表是 EndpointIndependentMapping 类型；否则需要进一步判断
@@ -167,27 +122,14 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 	// Step3: 探测 AddressDependentMapping 和 AddressAndPortDependentMapping
 	stunAddr.Port = attributes1[AttributesName[ChangedAddress]].Port
 	req = buildRequestHeader(0)
-	_, err = conn.WriteToUDP(req, stunAddr)
-	if err != nil {
-		return UnknownMapping, err
-	}
-
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err != nil {
-		return UnknownMapping, err
-	}
-	read, _, err = conn.ReadFromUDP(buff)
+	attributes3, err := probeSendAndReceive(ctx, conn, stunAddr, req)
 	if err != nil {
 		netErr, ok := err.(*net.OpError)
 		if ok && netErr.Timeout() {
-			return UnknownMapping, nil
+			return UDPBlocked, nil
 		} else {
-			return UDPBlocked, err
+			return UnknownMapping, err
 		}
-	}
-	attributes3, err := parseResponseAttributes(buff[:read])
-	if err != nil {
-		return UnknownMapping, err
 	}
 
 	// 如果第二次的地址和这一次的地址一致，则代表是 AddressDependentMapping 类型；否则是 AddressAndPortDependentMapping 类型
@@ -197,62 +139,6 @@ func probeMappingBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (MappingBeha
 	} else {
 		return AddressAndPortDependentMapping, nil
 	}
-	return UnknownMapping, nil
-}
-
-func probeFilterBehavior(conn *net.UDPConn, stunAddr *net.UDPAddr) (FilteringBehavior, error) {
-	buff := make([]byte, 1024)
-
-	// Step1: 探测主机是否位于 NAT 后面
-	req := buildChangePortAndIPRequest(true, true)
-	_, err := conn.WriteToUDP(req, stunAddr)
-	if err != nil {
-		return UnknownFiltering, err
-	}
-
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err != nil {
-		return UnknownFiltering, err
-	}
-	read, _, err := conn.ReadFromUDP(buff)
-	if err != nil {
-		netErr, ok := err.(*net.OpError)
-		if ok && netErr.Timeout() {
-			goto step2
-		} else {
-			return UDPBlocked, err
-		}
-	}
-	_, err = parseResponseAttributes(buff[:read])
-	if err == nil {
-		return EndpointIndependentFiltering, err
-	}
-
-step2:
-	req = buildChangePortAndIPRequest(false, true)
-	_, err = conn.WriteToUDP(req, stunAddr)
-	if err != nil {
-		return UnknownFiltering, err
-	}
-
-	err = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if err != nil {
-		return UnknownFiltering, err
-	}
-	read, _, err = conn.ReadFromUDP(buff)
-	if err != nil {
-		netErr, ok := err.(*net.OpError)
-		if ok && netErr.Timeout() {
-			return AddressAndPortDependentFiltering, nil
-		} else {
-			return UDPBlocked, err
-		}
-	}
-	_, err = parseResponseAttributes(buff[:read])
-	if err == nil {
-		return AddressDependentFiltering, nil
-	}
-	return UnknownFiltering, nil
 }
 
 func isLocalAddrEqualRemoteAddr(laddr, raddr netip.AddrPort) bool {
@@ -272,6 +158,89 @@ func isLocalAddrEqualRemoteAddr(laddr, raddr netip.AddrPort) bool {
 			return true
 		}
 	}
-
 	return false
+}
+
+func probeFilterBehavior(ctx context.Context, conn *net.UDPConn, stunAddr *net.UDPAddr) (FilteringBehavior, error) {
+	log.Println("Start probe filtering behavior...")
+	defer log.Println("End probe filtering behavior!")
+
+	// Step1: 探测 Endpoint-Independent Filtering
+	req := buildChangePortAndIPRequest(true, true)
+	_, err := probeSendAndReceive(ctx, conn, stunAddr, req)
+	if err != nil {
+		netErr, ok := err.(*net.OpError)
+		if ok && netErr.Timeout() {
+			goto step2
+		} else {
+			return UDPBlocked, err
+		}
+	} else {
+		return EndpointIndependentFiltering, err
+	}
+
+step2:
+	// Step2: 探测 Address-Dependent Filtering 和 Address and Port-Dependent Filtering
+	req = buildChangePortAndIPRequest(false, true)
+	_, err = probeSendAndReceive(ctx, conn, stunAddr, req)
+	if err != nil {
+		netErr, ok := err.(*net.OpError)
+		if ok && netErr.Timeout() {
+			return AddressAndPortDependentFiltering, nil
+		} else {
+			return UnknownFiltering, err
+		}
+	}
+	return AddressDependentFiltering, nil
+}
+
+func probeSendAndReceive(ctx context.Context, conn *net.UDPConn, stunAddr *net.UDPAddr, req []byte) (map[string]AddressAttribute, error) {
+	buff := make([]byte, 1024)
+
+	for i := 0; i < SetTryoutTimes; i++ {
+		log.Printf("The number of attempts is %d", i)
+		err := conn.SetWriteDeadline(time.Now().Add(SetConnTimeout))
+		if err != nil {
+			if i != SetTryoutTimes-1 {
+				continue
+			}
+			return nil, err
+		}
+
+		_, err = conn.WriteToUDP(req, stunAddr)
+		if err != nil {
+			if i != SetTryoutTimes-1 {
+				continue
+			} else {
+				return nil, err
+			}
+		}
+
+		err = conn.SetReadDeadline(time.Now().Add(SetConnTimeout))
+		if err != nil {
+			if i != SetTryoutTimes-1 {
+				continue
+			}
+			return nil, err
+		}
+
+		read, _, err := conn.ReadFromUDP(buff)
+		if err != nil {
+			if i != SetTryoutTimes-1 {
+				continue
+			} else {
+				return nil, err
+			}
+		}
+		attributes, err := parseResponseAttributes(buff[:read])
+		if err != nil {
+			if i != SetTryoutTimes-1 {
+				continue
+			}
+			return nil, err
+		} else {
+			return attributes, nil
+		}
+	}
+	return nil, nil
 }
