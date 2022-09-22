@@ -1,6 +1,6 @@
 package protocol
 
-import "go-vpn/util"
+import "go-vpn/pkg"
 
 type ICMPRaw struct {
 	Type     byte
@@ -28,10 +28,10 @@ type ICMP struct {
 func (p Protocol) parseICMPRawPacket(packet ICMPRaw) *ICMP {
 	icmp := &ICMP{}
 
-	icmp.Type = util.Binary2Decimal(util.Bytes2Bits(packet.Type))
-	icmp.Code = util.Binary2Decimal(util.Bytes2Bits(packet.Code))
+	icmp.Type = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.Type))
+	icmp.Code = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.Code))
 	icmp.ControlMessage = parseICMPControlMessages(icmp.Type, icmp.Code)
-	icmp.CheckSum = util.Binary2Decimal(util.Bytes2Bits(packet.CheckSum[0], packet.CheckSum[1]))
+	icmp.CheckSum = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.CheckSum[0], packet.CheckSum[1]))
 	icmp.Data = packet.Data[:]
 
 	return icmp

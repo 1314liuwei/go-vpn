@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"go-vpn/util"
+	"go-vpn/pkg"
 	"net"
 )
 
@@ -48,13 +48,13 @@ func (p Protocol) parseIPv4RawPacket(packet IPv4Raw) *IPv4 {
 	ipv4 := &IPv4{}
 
 	ipv4.Version, ipv4.HeaderLength = parseVersionAndHeaderLength(packet.VersionAndHeaderLength)
-	ipv4.DSCP = util.Binary2Decimal(util.Bytes2Bits(packet.DifferentiatedServicesField)[:6])
-	ipv4.TotalLength = util.Binary2Decimal(util.Bytes2Bits(packet.TotalLength[0], packet.TotalLength[1]))
-	ipv4.ID = util.Binary2Decimal(util.Bytes2Bits(packet.Identification[0], packet.Identification[1]))
+	ipv4.DSCP = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.DifferentiatedServicesField)[:6])
+	ipv4.TotalLength = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.TotalLength[0], packet.TotalLength[1]))
+	ipv4.ID = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.Identification[0], packet.Identification[1]))
 	ipv4.DF, ipv4.MF, ipv4.Offset = parseFlags(packet.Flags)
-	ipv4.TTL = util.Binary2Decimal(util.Bytes2Bits(packet.TimeToLive))
-	ipv4.Protocol = IPv4Protocol(util.Binary2Decimal(util.Bytes2Bits(packet.Protocol)))
-	ipv4.HeaderChecksum = util.Binary2Decimal(util.Bytes2Bits(packet.HeaderChecksum[0], packet.HeaderChecksum[1]))
+	ipv4.TTL = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.TimeToLive))
+	ipv4.Protocol = IPv4Protocol(pkg.Binary2Decimal(pkg.Bytes2Bits(packet.Protocol)))
+	ipv4.HeaderChecksum = pkg.Binary2Decimal(pkg.Bytes2Bits(packet.HeaderChecksum[0], packet.HeaderChecksum[1]))
 	ipv4.SourceAddr = net.IPv4(packet.SourceAddr[0], packet.SourceAddr[1], packet.SourceAddr[2], packet.SourceAddr[3])
 	ipv4.DestAddr = net.IPv4(packet.DestAddr[0], packet.DestAddr[1], packet.DestAddr[2], packet.DestAddr[3])
 
@@ -65,9 +65,9 @@ func parseVersionAndHeaderLength(value byte) (int, int) {
 	var (
 		version, headerLength int
 	)
-	buff := util.Bytes2Bits(value)
-	version = util.Binary2Decimal(buff[:4])
-	headerLength = util.Binary2Decimal(buff[4:])
+	buff := pkg.Bytes2Bits(value)
+	version = pkg.Binary2Decimal(buff[:4])
+	headerLength = pkg.Binary2Decimal(buff[4:])
 	return version, headerLength
 }
 
@@ -77,10 +77,10 @@ func parseFlags(value [2]byte) (bool, bool, int) {
 		offset int
 	)
 
-	buff := util.Bytes2Bits(value[0])
-	buff = append(buff, util.Bytes2Bits(value[1])...)
+	buff := pkg.Bytes2Bits(value[0])
+	buff = append(buff, pkg.Bytes2Bits(value[1])...)
 	df = buff[1] == 1
 	mf = buff[2] == 1
-	offset = util.Binary2Decimal(buff[3:])
+	offset = pkg.Binary2Decimal(buff[3:])
 	return df, mf, offset
 }

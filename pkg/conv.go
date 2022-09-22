@@ -1,4 +1,4 @@
-package util
+package pkg
 
 func Bytes2Bits(data ...byte) []byte {
 	dst := make([]byte, 0)

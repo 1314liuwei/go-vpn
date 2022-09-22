@@ -2,7 +2,7 @@ package netcheck
 
 import (
 	"encoding/binary"
-	"go-vpn/util"
+	"go-vpn/pkg"
 	"math/rand"
 	"net"
 	"time"
@@ -120,10 +120,10 @@ func parseResponseAttributes(buff []byte) (map[string]AddressAttribute, error) {
 	size := int(unsafe.Sizeof(STUNHeaderPacket{}))
 	i = size
 
-	for i-size < util.Binary2Decimal(util.Bytes2Bits(header.MessageLength[0], header.MessageLength[1])) {
-		AttributeTypeValue := util.Binary2Decimal(util.Bytes2Bits(buff[i], buff[i+1]))
+	for i-size < pkg.Binary2Decimal(pkg.Bytes2Bits(header.MessageLength[0], header.MessageLength[1])) {
+		AttributeTypeValue := pkg.Binary2Decimal(pkg.Bytes2Bits(buff[i], buff[i+1]))
 		i += 2
-		AttributeLength := util.Binary2Decimal(util.Bytes2Bits(buff[i], buff[i+1]))
+		AttributeLength := pkg.Binary2Decimal(pkg.Bytes2Bits(buff[i], buff[i+1]))
 		i += 2
 
 		switch AttributeTypeValue {
@@ -139,9 +139,9 @@ func parseResponseAttributes(buff []byte) (map[string]AddressAttribute, error) {
 }
 
 func parseAddressAttribute(buff []byte) AddressAttribute {
-	Reserved := util.Binary2Decimal(util.Bytes2Bits(buff[0]))
-	ProtocolFamily := util.Binary2Decimal(util.Bytes2Bits(buff[1]))
-	Port := util.Binary2Decimal(util.Bytes2Bits(buff[2], buff[3]))
+	Reserved := pkg.Binary2Decimal(pkg.Bytes2Bits(buff[0]))
+	ProtocolFamily := pkg.Binary2Decimal(pkg.Bytes2Bits(buff[1]))
+	Port := pkg.Binary2Decimal(pkg.Bytes2Bits(buff[2], buff[3]))
 	IP := net.IPv4(buff[4], buff[5], buff[6], buff[7]).To4()
 
 	out := AddressAttribute{
