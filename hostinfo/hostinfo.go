@@ -1,8 +1,10 @@
 package hostinfo
 
 import (
+	"bufio"
 	"os"
 	"runtime"
+	"strings"
 )
 
 type HostInfo struct {
@@ -52,5 +54,30 @@ func (p probe) linuxDesktopOS() bool {
 	if runtime.GOOS != "linux" {
 		return false
 	}
-	return true
+
+	procFile := "/proc/net/unix"
+	file, err := os.Open(procFile)
+	if err != nil {
+		return false
+	}
+
+	desktopProc := []string{
+		" @/tmp/dbus-",
+		".X11-unix",
+		"/wayland-1",
+	}
+	buff := bufio.NewScanner(file)
+	for {
+		if !buff.Scan() {
+			break
+		}
+		line := buff.Text()
+		for i := 0; i < len(desktopProc); i++ {
+			if strings.Contains(line, desktopProc[i]) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

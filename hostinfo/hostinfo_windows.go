@@ -11,9 +11,7 @@ func init() {
 }
 
 func osVersionFuncWindows() string {
-	version, err := windows.GetVersion()
-	if err != nil {
-		return ""
-	}
-	return fmt.Sprintf("%d.%d (%d)", byte(version), uint8(version>>8), version>>16)
+	major, minor, build := windows.RtlGetNtVersionNumbers()
+	version := fmt.Sprintf("%d.%d.%d", major, minor, build)
+	return version
 }

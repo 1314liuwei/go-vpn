@@ -1,6 +1,9 @@
 package hostinfo
 
-import "io/ioutil"
+import (
+	"io/ioutil"
+	"regexp"
+)
 
 func init() {
 	osVersionFunc = osVersionFuncLinux
@@ -12,5 +15,14 @@ func osVersionFuncLinux() string {
 	if err != nil {
 		return ""
 	}
-	return string(file)
+
+	compile, err := regexp.Compile(`PRETTY_NAME="(.*?)"`)
+	if err != nil {
+		return ""
+	}
+	result := compile.FindSubmatch(file)
+	if len(result) > 1 {
+		return string(result[1])
+	}
+	return ""
 }
